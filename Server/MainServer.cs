@@ -10,12 +10,15 @@ namespace Server
 {
     public class MainServer
     {        
-        TcpListener server = null;        
+        TcpListener server = null;
+        UdpClient udp = null;
         IPAddress adress = IPAddress.Parse("127.0.0.1");//IP server
         int tcpPort = 8888;//TCP port server
         int udpPort = 9999;//Udp port server
-        string pathOfFile = string.Empty; //расположение файла, берётся из ввода
+        string fileName = string.Empty; //расположение файла, берётся из ввода
         string nameOfFile = string.Empty; //название файла, получается от клиента
+        List<byte[]> list = new List<byte[]>();
+        string path = @"C:\Users\user\Desktop\NetSchool2021-master";
 
         private void InputServerData()
         {
@@ -31,7 +34,7 @@ namespace Server
             {
                 adress = IPAddress.Parse(mass[0]);
                 tcpPort = Int32.Parse(mass[1]);
-                pathOfFile = mass[2];
+                fileName = mass[2];
             }
             catch (Exception e)
             {
@@ -39,6 +42,7 @@ namespace Server
             }
         }
 
+        //Отсылаем 
         private void SendServerTcp(TcpClient client, NetworkStream stream)
         {
             // сообщение для отправки клиенту
@@ -52,8 +56,8 @@ namespace Server
         }
 
         
-
-        private void AcceptServerTcp(TcpClient client, NetworkStream stream)
+        //Принимаем сообщение об имени файла
+        private List<string> AcceptServerTcp(TcpClient client, NetworkStream stream)
         {
             // Переменные для чтения
             byte[] data = new byte[256];
@@ -69,37 +73,60 @@ namespace Server
             string response = readResponse.ToString().Trim();
             Console.WriteLine("Получено сообщение:");
 
-            
-            pathOfFile = response.Substring(0,response.LastIndexOf(" "));
-            Console.WriteLine("\tНазвание файла: " + pathOfFile);
+            List<string> responseList = new List<string>();
+            fileName = response.Substring(0,response.LastIndexOf(" "));
+            Console.WriteLine("\tНазвание файла: " + fileName);
+            responseList.Add(fileName);
             udpPort = Int32.Parse(response.Substring(response.LastIndexOf(" ") + 1));
             Console.WriteLine("\tUDP порт: " + udpPort);
-            stream.Close();
+            responseList.Add(udpPort.ToString());
+            return responseList;
         }
 
 
-        //private void AcceptServerUdp()
-        //{
-        //    UdpClient receiver = new UdpClient(); // UdpClient для получения данных
-        //    IPEndPoint remoteIp = null; // адрес входящего подключения
-        //    try
-        //    {
-        //        while (true)
-        //        {
-        //            byte[] data = receiver.Receive(ref remoteIp); // получаем данные
-        //            string message = Encoding.Unicode.GetString(data);
-        //            Console.WriteLine("Собеседник: {0}", message);
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine(ex.Message);
-        //    }
-        //    finally
-        //    {
-        //        receiver.Close();
-        //    }
-        //}
+        private void AcceptServerUdp(UdpClient udpClient, string path, string name)
+        {
+            try
+            {
+
+                IPEndPoint RemoteIpEndPoint = null;
+                // Получаем файл
+                byte[] bytes;
+                List<byte[]> list = new List<byte[]>();
+                udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 9999));
+                while (true)
+                {
+                    Console.WriteLine("-----------*******Ожидается получение файла*******-----------");
+                    bytes = udpClient.Receive(ref RemoteIpEndPoint);
+                    if (bytes.Length > 1)
+                    {
+                        Console.WriteLine("-----------*******Получен файл*******-----------");
+                        list.Add(bytes);
+                    }
+                    if (list.Count == 2)
+                    {
+                        Console.WriteLine("Всё собрано");
+                        break;
+                    }
+
+                }
+                SaveDataInFile(list, path, name);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+        }
+
+        private void SaveDataInFile(List<byte[]> list, string path, string name)
+        {
+            string newPath = path + @"\" + name;
+            using (FileStream fileStream = new FileStream(newPath, FileMode.OpenOrCreate, FileAccess.Write))
+            {
+                for (int i = 0; i < list.Count; i++)
+                    fileStream.Write(list[i], 0,list[i].Length);
+            }
+        }
 
         public void CreateServer()
         {
@@ -119,12 +146,16 @@ namespace Server
                     //отсылаем оповещение о подключении
                     SendServerTcp(client, stream);
 
-                    AcceptServerTcp(client, stream);
-                    
+                    List<string> list;
+                    list = AcceptServerTcp(client, stream);
+                    nameOfFile = list[0];
+                    udpPort = Int32.Parse(list[1]);
+                    UdpClient udpClient = new UdpClient();
+                    AcceptServerUdp(udpClient, path, nameOfFile);
 
-                    
-                    //// закрываем подключение
-                    //client.Close();
+
+                    //// закрываем подключение                    
+                    client.Close();
                 }
             }
             catch (Exception e)
