@@ -84,7 +84,7 @@ namespace Server
         }
 
 
-        private void AcceptServerUdp(UdpClient udpClient, string path, string name)
+        private void AcceptServerUdp(UdpClient udpClient, NetworkStream stream, string path, string name)
         {
             try
             {
@@ -104,13 +104,24 @@ namespace Server
                         list.Add(bytes);
                         //отправка подтверждения
                     }
+
+                    if (bytes.Length > 0)
+                    {
+                        string AcceptResponse = "Пакет получен";
+                        // преобразуем сообщение в массив байтов
+                        byte[] acceptBytes = Encoding.UTF8.GetBytes(AcceptResponse);
+                        // отправка сообщения
+                        stream.Write(acceptBytes, 0, acceptBytes.Length);
+                        Console.WriteLine("Отправлено сообщение: {0}", AcceptResponse);
+                        // закрываем поток
+                    }
+
                     //получение сообщения о завершении
                     if (list.Count == 2)
                     {
                         Console.WriteLine("Всё собрано");
                         break;
-                    }
-
+                    }                   
                 }
                 //сохранение
                 SaveDataInFile(list, path, name);
@@ -155,7 +166,7 @@ namespace Server
                     nameOfFile = list[0];
                     udpPort = Int32.Parse(list[1]);
                     UdpClient udpClient = new UdpClient();
-                    AcceptServerUdp(udpClient, path, nameOfFile);
+                    AcceptServerUdp(udpClient, stream, path, nameOfFile);
 
 
                     //// закрываем подключение                    

@@ -47,11 +47,10 @@ namespace Client
 
                 udpClient = new UdpClient();
 
-                SendClientFileUdp(udpClient, tcpListener, path);
+                SendClientFileUdp(udpClient, stream, tcpClient,path);
 
-                //SendUdpFile(path, udpServerPort.ToString(), tcpClient, stream);
                 
-                tcpClient.Close();
+                
             }
             catch (SocketException e)
             {
@@ -66,28 +65,48 @@ namespace Client
             Console.Read();
         }
 
-        private void SendClientFileUdp(UdpClient udpClient, TcpListener tcpListener, string path)
+        private void SendClientFileUdp(UdpClient udpClient, NetworkStream stream, TcpClient tcpClient, string path)
         {
-
-            FileStream fs = new FileStream(path.ToString(), FileMode.Open, FileAccess.Read);
-            // Отправляем сам файл
-            int parts = SizeOfFile(fs);
-            //tcpListener.Start();
-
-            Thread.Sleep(5000);
-            IPEndPoint endPoint = new IPEndPoint(ipAddress, udpServerPort);
-            for (int i = 0; i < parts; i++)
+            
+            using (FileStream fs = new FileStream(path.ToString(), FileMode.Open, FileAccess.Read))
             {
-                byte[] bytes = new Byte[8192];
-                fs.Read(bytes, 0, bytes.Length);
-                Console.WriteLine($"-----------*******Отправка блока файла номер {i+1}*******-----------");
-                udpClient.Send(bytes, bytes.Length, endPoint);
-                Console.WriteLine($"-----------*******Файл {i+1} отправлен*******-----------");
-            }
-            Thread.Sleep(10000);
-            Console.WriteLine($"-----------*******Файлы отправлены*******-----------");
+                // определяем размер файла
+                int parts = SizeOfFile(fs);
 
-            Console.WriteLine("-----------*******Udp соединение закрыто*******-----------");
+                Thread.Sleep(500);
+                IPEndPoint endPoint = new IPEndPoint(ipAddress, udpServerPort);
+                for (int i = 0; i < parts; i++)
+                {
+                    // Блок должен содержать номер ID
+                    byte[] sendBytes = new Byte[8192];
+                    fs.Read(sendBytes, 0, sendBytes.Length);
+                    Console.WriteLine($"-----------*******Отправка блока файла номер {i + 1}*******-----------");
+                    udpClient.Send(sendBytes, sendBytes.Length, endPoint);
+                    Console.WriteLine($"-----------*******Блок {i + 1} отправлен*******-----------");
+
+                    //получение подтверждения
+                    byte[] data = new byte[256];
+                    StringBuilder readResponse = new StringBuilder();
+
+                    //Чтение данных
+                    do
+                    {
+                        int bytes = stream.Read(data, 0, data.Length);
+                        readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
+                    }
+                    while (stream.DataAvailable); // пока данные есть в потоке
+
+                    Console.WriteLine("Получено сообщение: " + readResponse.ToString());
+
+                }
+            }
+            Console.WriteLine($"-----------*******Все блоки отправлены*******-----------");
+            
+            stream.Close();
+            udpClient.Close();
+            tcpClient.Close();
+            
+            Console.WriteLine("-----------*******Клиент отключен*******-----------");
         }
 
         private int SizeOfFile(FileStream fs)
@@ -149,8 +168,7 @@ namespace Client
             byte[] data = Encoding.UTF8.GetBytes(response);
             stream.Write(data, 0, data.Length);
             Console.WriteLine("Отправлено сообщение: " + response);
-            // Закрываем потоки
-            stream.Close();
+            
         }
 
     }
