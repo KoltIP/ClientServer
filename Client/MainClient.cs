@@ -22,44 +22,14 @@ namespace Client
         private const int timeOut = 5000; //ТаймАут
 
 
-        public void SendClientFileUdp(UdpClient udpClient, TcpListener tcpListener, string path)
-        {
-            
-            FileStream fs = new FileStream(path.ToString(), FileMode.Open, FileAccess.Read);
-            // Отправляем сам файл
-            int parts = SizeOfFile(fs);
-            //tcpListener.Start();
-
-            Thread.Sleep(5000);
-            IPEndPoint endPoint = new IPEndPoint(ipAddress, udpServerPort);
-            for (int i = 0; i < parts; i++)
-            {
-                byte[] bytes = new Byte[8192];
-                fs.Read(bytes, 0, bytes.Length);                
-                Console.WriteLine($"-----------*******Ожидается отправка файла {0}*******-----------", i);
-                udpClient.Send(bytes, bytes.Length, endPoint);
-                Console.WriteLine($"-----------*******Файл {0} отправлен*******-----------", i);
-            }
-            Thread.Sleep(10000);
-            Console.WriteLine($"-----------*******Файлы отправлены*******-----------");
-            
-            Console.WriteLine("-----------*******Udp Closed*******-----------");
-        }
-
-        public int SizeOfFile(FileStream fs)
-        {
-            int packetSize = 8192;
-            int parts = (int)fs.Length / packetSize;
-            if ((int)fs.Length % packetSize != 0)
-                parts++;
-            return parts;
-        }
+        
 
 
 
 
         public void CreateClient()
         {
+            //ввод данных вручную
             //InputData();
             try
             {
@@ -94,6 +64,39 @@ namespace Client
 
             Console.WriteLine("Подключение завершено...");
             Console.Read();
+        }
+
+        private void SendClientFileUdp(UdpClient udpClient, TcpListener tcpListener, string path)
+        {
+
+            FileStream fs = new FileStream(path.ToString(), FileMode.Open, FileAccess.Read);
+            // Отправляем сам файл
+            int parts = SizeOfFile(fs);
+            //tcpListener.Start();
+
+            Thread.Sleep(5000);
+            IPEndPoint endPoint = new IPEndPoint(ipAddress, udpServerPort);
+            for (int i = 0; i < parts; i++)
+            {
+                byte[] bytes = new Byte[8192];
+                fs.Read(bytes, 0, bytes.Length);
+                Console.WriteLine($"-----------*******Отправка блока файла номер {i+1}*******-----------");
+                udpClient.Send(bytes, bytes.Length, endPoint);
+                Console.WriteLine($"-----------*******Файл {i+1} отправлен*******-----------");
+            }
+            Thread.Sleep(10000);
+            Console.WriteLine($"-----------*******Файлы отправлены*******-----------");
+
+            Console.WriteLine("-----------*******Udp соединение закрыто*******-----------");
+        }
+
+        private int SizeOfFile(FileStream fs)
+        {
+            int packetSize = 8192;
+            int parts = (int)fs.Length / packetSize;
+            if ((int)fs.Length % packetSize != 0)
+                parts++;
+            return parts;
         }
 
         private void InputClientData()
