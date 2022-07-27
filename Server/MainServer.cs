@@ -102,7 +102,9 @@ namespace Server
                     {
                         Console.WriteLine("-----------*******Получен файл*******-----------");
                         list.Add(bytes);
+                        //отправка подтверждения
                     }
+                    //получение сообщения о завершении
                     if (list.Count == 2)
                     {
                         Console.WriteLine("Всё собрано");
@@ -110,6 +112,7 @@ namespace Server
                     }
 
                 }
+                //сохранение
                 SaveDataInFile(list, path, name);
             }
             catch (Exception e)
@@ -130,6 +133,7 @@ namespace Server
 
         public void CreateServer()
         {
+            //ввод данных вручную
             server = new TcpListener(adress, tcpPort);
             try
             {
