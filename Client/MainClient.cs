@@ -39,10 +39,10 @@ namespace Client
 
                 //Отправка имени файла и порт UDP
                 SendClientTcp(tcpClient, stream);
-                            
+
                 udpClient = new UdpClient();
 
-                SendClientFileUdp(udpClient, stream, tcpClient,path);
+                SendClientFileUdp(udpClient, stream, tcpClient, path);
             }
             catch (SocketException e)
             {
@@ -65,26 +65,23 @@ namespace Client
                 int parts = SizeOfFile(fs);
 
                 Thread.Sleep(500);
-                IPEndPoint endPoint = new IPEndPoint(ipAddress, udpServerPort);               
+                IPEndPoint endPoint = new IPEndPoint(ipAddress, udpServerPort);
 
 
                 for (int i = 0; i < parts; i++)
                 {
                     //Отправка блока файла
-                    SendBlockOfFile(fs, i, endPoint);
+                    SendBlockOfFile(stream,fs, i, endPoint);
 
                     //получение подтверждения СТАРЫЙ ВАРИАНТ
-                    AcceptConfirm(stream);
+                    //AcceptConfirm(stream);
                 }
                 string message = "111";
                 Console.WriteLine($"Все блоки отправлены");
-                byte[] sendBytes = Encoding.Default.GetBytes(message); 
-                              
+                byte[] sendBytes = Encoding.Default.GetBytes(message);
+
                 udpClient.Send(sendBytes, sendBytes.Length, endPoint);
                 Console.WriteLine($"Отправлено сообщение о завершении сеанса");
-
-
-
 
                 stream.Close();
                 udpClient.Close();
@@ -95,14 +92,14 @@ namespace Client
         }
 
         //Отправка блока файла
-        private void SendBlockOfFile(FileStream fs, int i, IPEndPoint endPoint)
+        private void SendBlockOfFile(NetworkStream stream,FileStream fs, int i, IPEndPoint endPoint)
         {
             byte[] sendBytes = new Byte[8192];
-            fs.Read(sendBytes, 0, sendBytes.Length-4);
+            fs.Read(sendBytes, 0, sendBytes.Length - 4);
 
 
             //добавление ID в блок 
-            byte[] idBytes = Encoding.Default.GetBytes(i.ToString());
+            byte[] idBytes = Encoding.Default.GetBytes((i+1).ToString());
             for (int j = 0; j < idBytes.Length; j++)
             {
                 sendBytes[sendBytes.Length - 4 + j] = idBytes[j];
@@ -110,23 +107,35 @@ namespace Client
             Console.WriteLine($"Отправка блока файла номер {i + 1}");
             udpClient.Send(sendBytes, sendBytes.Length, endPoint);
             Console.WriteLine($"Блок {i + 1} отправлен");
+            AcceptConfirm(stream, sendBytes, endPoint);
         }
 
         //Старая версия
-        private void AcceptConfirm(NetworkStream stream)
+        private void AcceptConfirm(NetworkStream stream, byte[] sendBytes, IPEndPoint endPoint)
         {
             byte[] data = new byte[256];
+            int bytes=0;
             StringBuilder readResponse = new StringBuilder();
             //Чтение данных
             do
             {
                 //Если время ожидания превышено повторная отправка файла                        
-
-                //Чтение ответа
-                int bytes = stream.Read(data, 0, data.Length);
-                readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
+                stream.Socket.ReceiveTimeout = 1000;
+                try
+                {
+                    //Чтение ответа
+                    //bytes = stream.Read(data, 0, data.Length);
+                    bytes = stream.Socket.Receive(data);
+                    readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Произошла ошибка при отправке, сервер не отправил ответ на получаемые данные." +
+                        "\nПроизводится попытка повторной отправки");
+                    udpClient.Send(sendBytes, sendBytes.Length, endPoint);                    
+                }
             }
-            while (stream.DataAvailable); // пока данные есть в потоке
+            while (stream.DataAvailable || bytes<=0); // пока данные есть в потоке
             Console.WriteLine("Получено сообщение: " + readResponse.ToString());
         }
 
@@ -193,7 +202,7 @@ namespace Client
             byte[] data = Encoding.UTF8.GetBytes(response);
             stream.Write(data, 0, data.Length);
             Console.WriteLine("Отправлено сообщение: " + response);
-            
+
         }
 
     }
