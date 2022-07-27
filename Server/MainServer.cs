@@ -105,6 +105,7 @@ namespace Server
                         //отправка подтверждения
                     }
 
+                    //отправление подтверждения СТАРАЯ ВЕРСИЯ
                     if (bytes.Length > 0)
                     {
                         string AcceptResponse = "Пакет получен";
@@ -116,12 +117,14 @@ namespace Server
                         // закрываем поток
                     }
 
+                    string flag = "111";
                     //получение сообщения о завершении
-                    if (list.Count == 2)
+                    if (Encoding.ASCII.GetString(list[list.Count-1]).ToString() == flag)
                     {
-                        Console.WriteLine("Всё собрано");
+                        list.RemoveAt(list.Count-1);
+                        Console.WriteLine("Все блоки получены. Приступаем к сборке.");
                         break;
-                    }                   
+                    }                 
                 }
                 //сохранение
                 SaveDataInFile(list, path, name);
@@ -140,6 +143,7 @@ namespace Server
                 for (int i = 0; i < list.Count; i++)
                     fileStream.Write(list[i], 0,list[i].Length);
             }
+            Console.WriteLine("Файл успешно собран.");
         }
 
         public void CreateServer()
@@ -167,10 +171,7 @@ namespace Server
                     udpPort = Int32.Parse(list[1]);
                     UdpClient udpClient = new UdpClient();
                     AcceptServerUdp(udpClient, stream, path, nameOfFile);
-
-
-                    //// закрываем подключение                    
-                    client.Close();
+                       
                 }
             }
             catch (Exception e)
