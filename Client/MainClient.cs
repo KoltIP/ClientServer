@@ -56,9 +56,7 @@ namespace Client
             Console.ReadLine();
         }
 
-        
-
-        
+        //Метод отправки файла по частям с подтверждением по TCP 
         private void SendClientFileUdp(UdpClient udpClient, NetworkStream stream, TcpClient tcpClient, string path)
         {
             using (FileStream fs = new FileStream(path.ToString(), FileMode.Open, FileAccess.Read))
@@ -67,12 +65,8 @@ namespace Client
                 int parts = SizeOfFile(fs);
 
                 Thread.Sleep(500);
-                IPEndPoint endPoint = new IPEndPoint(ipAddress, udpServerPort);
+                IPEndPoint endPoint = new IPEndPoint(ipAddress, udpServerPort);               
 
-                
-
-                // получаем сообщение
-                StringBuilder builder = new StringBuilder();
 
                 for (int i = 0; i < parts; i++)
                 {
@@ -83,11 +77,11 @@ namespace Client
                     AcceptConfirm(stream);
                 }
                 string message = "111";
-                Console.WriteLine($"-----------*******Все блоки отправлены*******-----------");
+                Console.WriteLine($"Все блоки отправлены");
                 byte[] sendBytes = Encoding.Default.GetBytes(message); 
                               
                 udpClient.Send(sendBytes, sendBytes.Length, endPoint);
-                Console.WriteLine($"-----------*******Отправлено сообщение о завершении сеанса*******-----------");
+                Console.WriteLine($"Отправлено сообщение о завершении сеанса");
 
 
 
@@ -104,11 +98,20 @@ namespace Client
         private void SendBlockOfFile(FileStream fs, int i, IPEndPoint endPoint)
         {
             byte[] sendBytes = new Byte[8192];
-            fs.Read(sendBytes, 0, sendBytes.Length);
-            Console.WriteLine($"-----------*******Отправка блока файла номер {i + 1}*******-----------");
+            fs.Read(sendBytes, 0, sendBytes.Length-4);
+
+
+            //добавление ID в блок 
+            byte[] idBytes = Encoding.Default.GetBytes(i.ToString());
+            for (int j = 0; j < idBytes.Length; j++)
+            {
+                sendBytes[sendBytes.Length - 4 + j] = idBytes[j];
+            }
+            Console.WriteLine($"Отправка блока файла номер {i + 1}");
             udpClient.Send(sendBytes, sendBytes.Length, endPoint);
-            Console.WriteLine($"-----------*******Блок {i + 1} отправлен*******-----------");
+            Console.WriteLine($"Блок {i + 1} отправлен");
         }
+
         //Старая версия
         private void AcceptConfirm(NetworkStream stream)
         {
@@ -124,9 +127,10 @@ namespace Client
                 readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
             }
             while (stream.DataAvailable); // пока данные есть в потоке
-            Console.WriteLine("-----------*******Получено сообщение: " + readResponse.ToString() + "*******-----------");
+            Console.WriteLine("Получено сообщение: " + readResponse.ToString());
         }
 
+        //Определение количества блоков, которые нужно отправить
         private int SizeOfFile(FileStream fs)
         {
             int packetSize = 8192;

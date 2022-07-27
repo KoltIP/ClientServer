@@ -83,11 +83,22 @@ namespace Server
             return responseList;
         }
 
+        //Отделение ID пакета от содержащейся в нём информации
+        private int ParseByteInId(byte[] bytes)
+        {
+            int id = -1;
+            string str = String.Empty;
+            str = Encoding.ASCII.GetString(bytes).ToString();
+            if (str != "" && str !=null && str.Length>4)
+                id = Int32.Parse((str.Substring(str.Length-4)).TrimEnd().TrimStart());
+            return id;
+        }
 
+        //Приём пакетов по Udp с отсылкой подтверждения по TCP
         private void AcceptServerUdp(UdpClient udpClient, NetworkStream stream, string path, string name)
         {
-            try
-            {
+            //try
+            //{
 
                 IPEndPoint RemoteIpEndPoint = null;
                 // Получаем файл
@@ -96,11 +107,13 @@ namespace Server
                 udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 9999));
                 while (true)
                 {
-                    Console.WriteLine("-----------*******Ожидается получение файла*******-----------");
+
+                    Console.WriteLine("Ожидается получение файла");
                     bytes = udpClient.Receive(ref RemoteIpEndPoint);
                     if (bytes.Length > 1)
                     {
-                        Console.WriteLine("-----------*******Получен файл*******-----------");
+                        int id = ParseByteInId(bytes);
+                        Console.WriteLine($"Получен блок файла с id  = {id}");
                         list.Add(bytes);
                         //отправка подтверждения
                     }
@@ -128,11 +141,12 @@ namespace Server
                 }
                 //сохранение
                 SaveDataInFile(list, path, name);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
+
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine(e.ToString());
+            //}
         }
 
         private void SaveDataInFile(List<byte[]> list, string path, string name)
@@ -141,7 +155,7 @@ namespace Server
             using (FileStream fileStream = new FileStream(newPath, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 for (int i = 0; i < list.Count; i++)
-                    fileStream.Write(list[i], 0,list[i].Length);
+                    fileStream.Write(list[i], 0,list[i].Length-4);
             }
             Console.WriteLine("Файл успешно собран.");
         }
@@ -150,8 +164,8 @@ namespace Server
         {
             //ввод данных вручную
             server = new TcpListener(adress, tcpPort);
-            try
-            {
+            //try
+            //{
                 server.Start();
 
                 Console.WriteLine("Ожидание подключений... ");
@@ -173,16 +187,16 @@ namespace Server
                     AcceptServerUdp(udpClient, stream, path, nameOfFile);
                        
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            finally
-            {
-                if (server != null)
-                    server.Stop();
-            }
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine(e.Message);
+            //}
+            //finally
+            //{
+            //    if (server != null)
+            //        server.Stop();
+            //}
         }
     }
 }
