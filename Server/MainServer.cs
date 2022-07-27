@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace Server
 {
     public class MainServer
-    {        
+    {
         TcpListener server = null;
         UdpClient udp = null;
         IPAddress adress = IPAddress.Parse("127.0.0.1");//IP server
@@ -55,13 +55,13 @@ namespace Server
             // закрываем поток
         }
 
-        
+
         //Принимаем сообщение об имени файла
         private List<string> AcceptServerTcp(TcpClient client, NetworkStream stream)
         {
             // Переменные для чтения
             byte[] data = new byte[256];
-            StringBuilder readResponse = new StringBuilder();            
+            StringBuilder readResponse = new StringBuilder();
             //Чтение данных
             do
             {
@@ -74,7 +74,7 @@ namespace Server
             Console.WriteLine("Получено сообщение:");
 
             List<string> responseList = new List<string>();
-            fileName = response.Substring(0,response.LastIndexOf(" "));
+            fileName = response.Substring(0, response.LastIndexOf(" "));
             Console.WriteLine("\tНазвание файла: " + fileName);
             responseList.Add(fileName);
             udpPort = Int32.Parse(response.Substring(response.LastIndexOf(" ") + 1));
@@ -89,8 +89,8 @@ namespace Server
             int id = -1;
             string str = String.Empty;
             str = Encoding.ASCII.GetString(bytes).ToString();
-            if (str != "" && str !=null && str.Length>4)
-                id = Int32.Parse((str.Substring(str.Length-4)).TrimEnd().TrimStart());
+            if (str != "" && str != null && str.Length > 4)
+                id = Int32.Parse((str.Substring(str.Length - 4)).TrimEnd().TrimStart());
             return id;
         }
 
@@ -100,47 +100,47 @@ namespace Server
             //try
             //{
 
-                IPEndPoint RemoteIpEndPoint = null;
-                // Получаем файл
-                byte[] bytes;
-                List<byte[]> list = new List<byte[]>();
-                udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 9999));
-                while (true)
+            IPEndPoint RemoteIpEndPoint = null;
+            // Получаем файл
+            byte[] bytes;
+            List<byte[]> list = new List<byte[]>();
+            udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 9999));
+            while (true)
+            {
+
+                Console.WriteLine("Ожидается получение файла");
+                bytes = udpClient.Receive(ref RemoteIpEndPoint);
+                if (bytes.Length > 1)
                 {
-
-                    Console.WriteLine("Ожидается получение файла");
-                    bytes = udpClient.Receive(ref RemoteIpEndPoint);
-                    if (bytes.Length > 1)
-                    {
-                        int id = ParseByteInId(bytes);
-                        Console.WriteLine($"Получен блок файла с id  = {id}");
-                        list.Add(bytes);
-                        //отправка подтверждения
-                    }
-
-                    //отправление подтверждения СТАРАЯ ВЕРСИЯ
-                    if (bytes.Length > 0)
-                    {
-                        string AcceptResponse = "Пакет получен";
-                        // преобразуем сообщение в массив байтов
-                        byte[] acceptBytes = Encoding.UTF8.GetBytes(AcceptResponse);
-                        // отправка сообщения
-                        stream.Write(acceptBytes, 0, acceptBytes.Length);
-                        Console.WriteLine("Отправлено сообщение: {0}", AcceptResponse);
-                        // закрываем поток
-                    }
-
-                    string flag = "111";
-                    //получение сообщения о завершении
-                    if (Encoding.ASCII.GetString(list[list.Count-1]).ToString() == flag)
-                    {
-                        list.RemoveAt(list.Count-1);
-                        Console.WriteLine("Все блоки получены. Приступаем к сборке.");
-                        break;
-                    }                 
+                    int id = ParseByteInId(bytes);
+                    Console.WriteLine($"Получен блок файла с id  = {id}");
+                    list.Add(bytes);
+                    //отправка подтверждения
                 }
-                //сохранение
-                SaveDataInFile(list, path, name);
+
+                //отправление подтверждения СТАРАЯ ВЕРСИЯ
+                if (bytes.Length > 0)
+                {
+                    string AcceptResponse = "Пакет получен";
+                    // преобразуем сообщение в массив байтов
+                    byte[] acceptBytes = Encoding.UTF8.GetBytes(AcceptResponse);
+                    // отправка сообщения
+                    stream.Write(acceptBytes, 0, acceptBytes.Length);
+                    Console.WriteLine("Отправлено сообщение: {0}", AcceptResponse);
+                    // закрываем поток
+                }
+
+                string flag = "111";
+                //получение сообщения о завершении
+                if (Encoding.ASCII.GetString(list[list.Count - 1]).ToString() == flag)
+                {
+                    list.RemoveAt(list.Count - 1);
+                    Console.WriteLine("Все блоки получены. Приступаем к сборке.");
+                    break;
+                }
+            }
+            //сохранение
+            SaveDataInFile(list, path, name);
 
             //}
             //catch (Exception e)
@@ -155,7 +155,7 @@ namespace Server
             using (FileStream fileStream = new FileStream(newPath, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 for (int i = 0; i < list.Count; i++)
-                    fileStream.Write(list[i], 0,list[i].Length-4);
+                    fileStream.Write(list[i], 0, list[i].Length - 4);
             }
             Console.WriteLine("Файл успешно собран.");
         }
@@ -166,27 +166,27 @@ namespace Server
             server = new TcpListener(adress, tcpPort);
             //try
             //{
-                server.Start();
+            server.Start();
 
-                Console.WriteLine("Ожидание подключений... ");
-                while (true)
-                {                  
-                    // получаем входящее подключение
-                    TcpClient client = server.AcceptTcpClient();
-                    NetworkStream stream = client.GetStream();
-                    Console.WriteLine("Подключен клиент. Выполнение запроса...");
+            Console.WriteLine("Ожидание подключений... ");
+            while (true)
+            {
+                // получаем входящее подключение
+                TcpClient client = server.AcceptTcpClient();
+                NetworkStream stream = client.GetStream();
+                Console.WriteLine("Подключен клиент. Выполнение запроса...");
 
-                    //отсылаем оповещение о подключении
-                    SendServerTcp(client, stream);
+                //отсылаем оповещение о подключении
+                SendServerTcp(client, stream);
 
-                    List<string> list;
-                    list = AcceptServerTcp(client, stream);
-                    nameOfFile = list[0];
-                    udpPort = Int32.Parse(list[1]);
-                    UdpClient udpClient = new UdpClient();
-                    AcceptServerUdp(udpClient, stream, path, nameOfFile);
-                       
-                }
+                List<string> list;
+                list = AcceptServerTcp(client, stream);
+                nameOfFile = list[0];
+                udpPort = Int32.Parse(list[1]);
+                UdpClient udpClient = new UdpClient();
+                AcceptServerUdp(udpClient, stream, path, nameOfFile);
+
+            }
             //}
             //catch (Exception e)
             //{
