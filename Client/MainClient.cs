@@ -99,7 +99,7 @@ namespace Client
 
 
             //добавление ID в блок 
-            byte[] idBytes = Encoding.Default.GetBytes(i.ToString());
+            byte[] idBytes = Encoding.Default.GetBytes((i+1).ToString());
             for (int j = 0; j < idBytes.Length; j++)
             {
                 sendBytes[sendBytes.Length - 4 + j] = idBytes[j];
@@ -124,12 +124,14 @@ namespace Client
                 try
                 {
                     //Чтение ответа
-                    bytes = stream.Read(data, 0, data.Length);
+                    //bytes = stream.Read(data, 0, data.Length);
+                    bytes = stream.Socket.Receive(data);
                     readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Произошла ошибка при отправке, сервер не отправил ответ на получаемые данные.");
+                    Console.WriteLine("Произошла ошибка при отправке, сервер не отправил ответ на получаемые данные." +
+                        "\nПроизводится попытка повторной отправки");
                     udpClient.Send(sendBytes, sendBytes.Length, endPoint);                    
                 }
             }

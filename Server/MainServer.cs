@@ -97,8 +97,6 @@ namespace Server
         //Приём пакетов по Udp с отсылкой подтверждения по TCP
         private void AcceptServerUdp(UdpClient udpClient, NetworkStream stream, string path, string name)
         {
-            //try
-            //{
 
             IPEndPoint RemoteIpEndPoint = null;
             // Получаем файл
@@ -115,7 +113,6 @@ namespace Server
                     int id = ParseByteInId(bytes);
                     Console.WriteLine($"Получен блок файла с id  = {id}");
                     list.Add(bytes);
-                    //отправка подтверждения
                 }
 
                 //отправление подтверждения СТАРАЯ ВЕРСИЯ
@@ -125,7 +122,8 @@ namespace Server
                     // преобразуем сообщение в массив байтов
                     byte[] acceptBytes = Encoding.UTF8.GetBytes(AcceptResponse);
                     // отправка сообщения
-                    stream.Write(acceptBytes, 0, acceptBytes.Length);
+                    //stream.Write(acceptBytes, 0, acceptBytes.Length);
+                    stream.Socket.Send(acceptBytes);
                     Console.WriteLine("Отправлено сообщение: {0}", AcceptResponse);
                     // закрываем поток
                 }
@@ -141,12 +139,6 @@ namespace Server
             }
             //сохранение
             SaveDataInFile(list, path, name);
-
-            //}
-            //catch (Exception e)
-            //{
-            //    Console.WriteLine(e.ToString());
-            //}
         }
 
         private void SaveDataInFile(List<byte[]> list, string path, string name)
@@ -157,46 +149,45 @@ namespace Server
                 for (int i = 0; i < list.Count; i++)
                     fileStream.Write(list[i], 0, list[i].Length - 4);
             }
-            Console.WriteLine("Файл успешно собран.");
+            Console.WriteLine($"Файл успешно собран. Вы можете ознакомиться с ним по пути:\n{newPath}");
         }
 
         public void CreateServer()
         {
             //ввод данных вручную
             server = new TcpListener(adress, tcpPort);
-            //try
-            //{
-            server.Start();
-
-            Console.WriteLine("Ожидание подключений... ");
-            while (true)
+            try
             {
-                // получаем входящее подключение
-                TcpClient client = server.AcceptTcpClient();
-                NetworkStream stream = client.GetStream();
-                Console.WriteLine("Подключен клиент. Выполнение запроса...");
+                server.Start();
 
-                //отсылаем оповещение о подключении
-                SendServerTcp(client, stream);
+                Console.WriteLine("Ожидание подключений... ");
+                while (true)
+                {
+                    // получаем входящее подключение
+                    TcpClient client = server.AcceptTcpClient();
+                    NetworkStream stream = client.GetStream();
+                    Console.WriteLine("Подключен клиент. Выполнение запроса...");
 
-                List<string> list;
-                list = AcceptServerTcp(client, stream);
-                nameOfFile = list[0];
-                udpPort = Int32.Parse(list[1]);
-                UdpClient udpClient = new UdpClient();
-                AcceptServerUdp(udpClient, stream, path, nameOfFile);
+                    //отсылаем оповещение о подключении
+                    SendServerTcp(client, stream);
 
+                    List<string> list;
+                    list = AcceptServerTcp(client, stream);
+                    nameOfFile = list[0];
+                    udpPort = Int32.Parse(list[1]);
+                    UdpClient udpClient = new UdpClient();
+                    AcceptServerUdp(udpClient, stream, path, nameOfFile);
+                }
             }
-            //}
-            //catch (Exception e)
-            //{
-            //    Console.WriteLine(e.Message);
-            //}
-            //finally
-            //{
-            //    if (server != null)
-            //        server.Stop();
-            //}
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            finally
+            {
+                if (server != null)
+                    server.Stop();
+            }
         }
     }
 }
