@@ -14,23 +14,67 @@ namespace Server
         int tcpPort; // Tcp порт, получаемый из ввода
         int udpPort; // Udp порт, получаемый из ввода
         string fileName = string.Empty; //имя файла, берётся из ввода
-        string path = string.Empty; //Расположение файла , берётся из ввода 
+        string path = string.Empty; //Расположение файла , берётся из ввода     
+        
+        //Основной метод сервера
+        public void CreateServer()
+        {
+            //ввод данных вручную
+            InputServerData();
 
+            TcpListener server = new TcpListener(adress, tcpPort);
+            try
+            {
+                server.Start();
+
+                Console.WriteLine("Ожидание подключений... ");
+                while (true)
+                {
+                    // получаем входящее подключение
+                    TcpClient client = server.AcceptTcpClient();
+                    NetworkStream stream = client.GetStream();
+                    Console.WriteLine("Подключен клиент. Выполнение запроса...");
+
+                    //отсылаем оповещение о подключении
+                    SendServerTcp(client, stream);
+
+                    List<string> list = AcceptServerTcp(client, stream);
+                    fileName = list[0];
+                    udpPort = Int32.Parse(list[1]);
+                    UdpClient udpClient = new UdpClient();
+                    AcceptServerUdp(udpClient, stream, path, fileName);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            finally
+            {
+                if (server != null)
+                    server.Stop();
+            }
+        }
+
+        //Ввод данных вручную
         private void InputServerData()
         {
             Console.WriteLine("Введите : \n\t1)IP\n\t2)Номер порта прослушивания\n\t3)Каталог, в который сохранится принятый файл\nВнимание, данные вводятся через пробел в одну строку.");
             string input = Console.ReadLine();
             string[] mass = input.Split(" ");
-            while (input == null || input == "" || mass.Length < 3 || mass.Length > 3)
+            while (input == null || input == "" || mass.Length < 3)
             {
-                Console.WriteLine("Неверный ввод. Попробуйте повторить попытку.");
+                Console.WriteLine("Неверный ввод или введено недостаточное количество параметров. Попробуйте повторить попытку.");
                 input = Console.ReadLine();
             }
             try
             {
                 adress = IPAddress.Parse(mass[0]);
                 tcpPort = Int32.Parse(mass[1]);
-                path = mass[2];
+                //Парсинг, в cлучае если путь к файлу содержит пробелы
+                for (int i = 2; i <= mass.Length - 1; i++)
+                    path += " " + mass[i];
+                path = path.Substring(1, path.Length - 1);
             }
             catch (Exception e)
             {
@@ -38,7 +82,7 @@ namespace Server
             }
         }
 
-        //Отсылаем 
+        //Посылка пользователю сообщения об успешеном подключении
         private void SendServerTcp(TcpClient client, NetworkStream stream)
         {
             // сообщение для отправки клиенту
@@ -51,8 +95,7 @@ namespace Server
             // закрываем поток
         }
 
-
-        //Принимаем сообщение об имени файла
+        //Получении сообщения об имени файла и порте для Udp соединения
         private List<string> AcceptServerTcp(TcpClient client, NetworkStream stream)
         {
             // Переменные для чтения
@@ -77,17 +120,6 @@ namespace Server
             Console.WriteLine("\tUDP порт: " + udpPort);
             responseList.Add(udpPort.ToString());
             return responseList;
-        }
-
-        //Отделение ID пакета от содержащейся в нём информации
-        private int ParseByteInId(byte[] bytes)
-        {
-            int id = -1;
-            string str = String.Empty;
-            str = Encoding.ASCII.GetString(bytes).ToString();
-            if (str != "" && str != null && str.Length > 4)
-                id = Int32.Parse((str.Substring(str.Length - 4)).TrimEnd().TrimStart());
-            return id;
         }
 
         //Приём пакетов по Udp с отсылкой подтверждения по TCP
@@ -137,6 +169,18 @@ namespace Server
             SaveDataInFile(list, path, name);
         }
 
+        //Отделение ID пакета от содержащейся в нём информации
+        private int ParseByteInId(byte[] bytes)
+        {
+            int id = -1;
+            string str = String.Empty;
+            str = Encoding.ASCII.GetString(bytes).ToString();
+            if (str != "" && str != null && str.Length > 4)
+                id = Int32.Parse((str.Substring(str.Length - 4)).TrimEnd().TrimStart());
+            return id;
+        }
+
+        //Сохранение файла с указанным именнем по указанному пути
         private void SaveDataInFile(List<byte[]> list, string path, string name)
         {
             string newPath = path + @"\" + name;
@@ -148,43 +192,5 @@ namespace Server
             Console.WriteLine($"Файл успешно собран. Вы можете ознакомиться с ним по пути:\n{newPath}");
         }
 
-        public void CreateServer()
-        {
-            //ввод данных вручную
-            InputServerData();
-
-            TcpListener server = new TcpListener(adress, tcpPort);
-            try
-            {
-                server.Start();
-
-                Console.WriteLine("Ожидание подключений... ");
-                while (true)
-                {
-                    // получаем входящее подключение
-                    TcpClient client = server.AcceptTcpClient();
-                    NetworkStream stream = client.GetStream();
-                    Console.WriteLine("Подключен клиент. Выполнение запроса...");
-
-                    //отсылаем оповещение о подключении
-                    SendServerTcp(client, stream);
-
-                    List<string> list = AcceptServerTcp(client, stream);
-                    fileName = list[0];
-                    udpPort = Int32.Parse(list[1]);
-                    UdpClient udpClient = new UdpClient();
-                    AcceptServerUdp(udpClient, stream, path, fileName);
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            finally
-            {
-                if (server != null)
-                    server.Stop();
-            }
-        }
     }
 }
