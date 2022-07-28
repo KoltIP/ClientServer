@@ -19,6 +19,7 @@ namespace Server
         //Основной метод сервера
         public void CreateServer()
         {
+            Console.WriteLine("-----------*******Сервер запущен*******-----------");
             //ввод данных вручную
             InputServerData();
 
@@ -85,14 +86,20 @@ namespace Server
         //Посылка пользователю сообщения об успешеном подключении
         private void SendServerTcp(TcpClient client, NetworkStream stream)
         {
-            // сообщение для отправки клиенту
-            string response = "Соединение установлено";
-            // преобразуем сообщение в массив байтов
-            byte[] data = Encoding.UTF8.GetBytes(response);
-            // отправка сообщения
-            stream.Write(data, 0, data.Length);
-            Console.WriteLine("Отправлено сообщение: {0}", response);
-            // закрываем поток
+            try
+            {
+                // сообщение для отправки клиенту
+                string response = "Соединение установлено";
+                // преобразуем сообщение в массив байтов
+                byte[] data = Encoding.UTF8.GetBytes(response);
+                // отправка сообщения
+                stream.Write(data, 0, data.Length);
+                Console.WriteLine("Отправлено сообщение: {0}", response);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
         }
 
         //Получении сообщения об имени файла и порте для Udp соединения
@@ -100,25 +107,41 @@ namespace Server
         {
             // Переменные для чтения
             byte[] data = new byte[256];
+            string response = string.Empty;
             StringBuilder readResponse = new StringBuilder();
-            //Чтение данных
-            do
+            try
             {
-                int bytes = stream.Read(data, 0, data.Length);
-                readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
+                //Чтение данных
+                do
+                {
+                    int bytes = stream.Read(data, 0, data.Length);
+                    readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
+                }
+                while (stream.DataAvailable); // пока данные есть в потоке
+            
+                response = readResponse.ToString().Trim();
+                Console.WriteLine("Получено сообщение:");
             }
-            while (stream.DataAvailable); // пока данные есть в потоке
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
 
-            string response = readResponse.ToString().Trim();
-            Console.WriteLine("Получено сообщение:");
 
             List<string> responseList = new List<string>();
-            fileName = response.Substring(0, response.LastIndexOf(" "));
-            Console.WriteLine("\tНазвание файла: " + fileName);
-            responseList.Add(fileName);
-            udpPort = Int32.Parse(response.Substring(response.LastIndexOf(" ") + 1));
-            Console.WriteLine("\tUDP порт: " + udpPort);
-            responseList.Add(udpPort.ToString());
+            try
+            {
+                fileName = response.Substring(0, response.LastIndexOf(" "));
+                Console.WriteLine("\tНазвание файла: " + fileName);
+                responseList.Add(fileName);
+                udpPort = Int32.Parse(response.Substring(response.LastIndexOf(" ") + 1));
+                Console.WriteLine("\tUDP порт: " + udpPort);
+                responseList.Add(udpPort.ToString());
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
             return responseList;
         }
 
@@ -130,39 +153,61 @@ namespace Server
             // Получаем файл
             byte[] bytes;
             List<byte[]> list = new List<byte[]>();
-            udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 9999));
+            try
+            {
+                udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 9999));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
             while (true)
             {
 
-                Console.WriteLine("Ожидается получение файла");
-                bytes = udpClient.Receive(ref RemoteIpEndPoint);
-                if (bytes.Length > 1)
+                Console.WriteLine("Ожидается получение пакетов файла");
+                try
                 {
-                    int id = ParseByteInId(bytes);
-                    Console.WriteLine($"Получен блок файла с id  = {id}");
-                    list.Add(bytes);
-                }
+                    bytes = udpClient.Receive(ref RemoteIpEndPoint);
+                    if (bytes.Length > 1)
+                    {
+                        int id = ParseByteInId(bytes);
+                        Console.WriteLine($"Получен пакет с id  = {id}");
+                        list.Add(bytes);
+                    }
+                
 
-                //отправление подтверждения СТАРАЯ ВЕРСИЯ
-                if (bytes.Length > 0)
+                    //отправление подтверждения СТАРАЯ ВЕРСИЯ
+                    if (bytes.Length > 0)
+                    {
+                        string AcceptResponse = "Пакет получен";
+                        // преобразуем сообщение в массив байтов
+                        byte[] acceptBytes = Encoding.UTF8.GetBytes(AcceptResponse);
+                        // отправка сообщения
+                        //stream.Write(acceptBytes, 0, acceptBytes.Length);
+                        stream.Socket.Send(acceptBytes);
+                        Console.WriteLine("Отправлено сообщение: {0}", AcceptResponse);
+                        // закрываем поток
+                    }
+                }
+                catch (Exception e)
                 {
-                    string AcceptResponse = "Пакет получен";
-                    // преобразуем сообщение в массив байтов
-                    byte[] acceptBytes = Encoding.UTF8.GetBytes(AcceptResponse);
-                    // отправка сообщения
-                    //stream.Write(acceptBytes, 0, acceptBytes.Length);
-                    stream.Socket.Send(acceptBytes);
-                    Console.WriteLine("Отправлено сообщение: {0}", AcceptResponse);
-                    // закрываем поток
+                    Console.WriteLine("Exception: {0}", e.Message);
                 }
 
                 string flag = "111";
-                //получение сообщения о завершении
-                if (Encoding.ASCII.GetString(list[list.Count - 1]).ToString() == flag)
+                try
                 {
-                    list.RemoveAt(list.Count - 1);
-                    Console.WriteLine("Все блоки получены. Приступаем к сборке.");
-                    break;
+                    //получение сообщения о завершении
+                    if (Encoding.ASCII.GetString(list[list.Count - 1]).ToString() == flag)
+                    {
+                        list.RemoveAt(list.Count - 1);
+                        Console.WriteLine("Все пакеты получены. Приступаем к сборке.");
+                        break;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Exception: {0}", e.Message);
                 }
             }
             //сохранение
@@ -174,22 +219,36 @@ namespace Server
         {
             int id = -1;
             string str = String.Empty;
-            str = Encoding.ASCII.GetString(bytes).ToString();
-            if (str != "" && str != null && str.Length > 4)
-                id = Int32.Parse((str.Substring(str.Length - 4)).TrimEnd().TrimStart());
+            try
+            {
+                str = Encoding.ASCII.GetString(bytes).ToString();
+                if (str != "" && str != null && str.Length > 4)
+                    id = Int32.Parse((str.Substring(str.Length - 4)).TrimEnd().TrimStart());
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
             return id;
         }
 
         //Сохранение файла с указанным именнем по указанному пути
         private void SaveDataInFile(List<byte[]> list, string path, string name)
         {
-            string newPath = path + @"\" + name;
-            using (FileStream fileStream = new FileStream(newPath, FileMode.OpenOrCreate, FileAccess.Write))
+            try
             {
-                for (int i = 0; i < list.Count; i++)
-                    fileStream.Write(list[i], 0, list[i].Length - 4);
+                string newPath = path + @"\" + name;
+                using (FileStream fileStream = new FileStream(newPath, FileMode.OpenOrCreate, FileAccess.Write))
+                {
+                    for (int i = 0; i < list.Count; i++)
+                        fileStream.Write(list[i], 0, list[i].Length - 4);
+                }
+                Console.WriteLine($"Файл успешно собран. Вы можете ознакомиться с ним по пути:\n{newPath}");
             }
-            Console.WriteLine($"Файл успешно собран. Вы можете ознакомиться с ним по пути:\n{newPath}");
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
         }
 
     }

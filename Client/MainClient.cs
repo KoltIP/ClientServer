@@ -22,6 +22,7 @@ namespace Client
         //Основной метод клиента
         public void CreateClient()
         {
+            Console.WriteLine("-----------*******Клиент открыт*******-----------");
             //ввод данных вручную
             InputClientData();
             try
@@ -43,8 +44,8 @@ namespace Client
                 //Создание UdpClient -а для отправки блоков файла
                 UdpClient udpClient = new UdpClient();
 
-                //Отравка файла по Udp с подтверждением по TCP сокету 
-                SendClientFileUdp(udpClient, stream, tcpClient, path);
+                    //Отравка файла по Udp с подтверждением по TCP сокету 
+                SendClientFileUdp(udpClient, stream, path);
             }
             catch (SocketException e)
             {
@@ -118,14 +119,19 @@ namespace Client
             byte[] data = new byte[256];
             StringBuilder readResponse = new StringBuilder();
 
-            //Чтение данных
-            do
-            {
-                int bytes = stream.Read(data, 0, data.Length);
-                readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
+            try
+            {   //Чтение данных
+                do
+                {
+                    int bytes = stream.Read(data, 0, data.Length);
+                    readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
+                }
+                while (stream.DataAvailable); // пока данные есть в потоке
             }
-            while (stream.DataAvailable); // пока данные есть в потоке
-
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
             Console.WriteLine("Получено сообщение: " + readResponse.ToString());
 
         }
@@ -133,15 +139,21 @@ namespace Client
         //Отправка данных об порте и имени файла
         private void SendClientTcp(NetworkStream stream)
         {
-            string response = Path.GetFileName(path) + " " + udpServerPort;
-            byte[] data = Encoding.UTF8.GetBytes(response);
-            stream.Write(data, 0, data.Length);
-            Console.WriteLine("Отправлено сообщение: " + response);
-
+            try
+            {
+                string response = Path.GetFileName(path) + " " + udpServerPort;
+                byte[] data = Encoding.UTF8.GetBytes(response);
+                stream.Write(data, 0, data.Length);
+                Console.WriteLine("Отправлено сообщение: " + response);
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
         }
 
         //Метод отправки файла по частям с подтверждением по TCP 
-        private void SendClientFileUdp(UdpClient udpClient, NetworkStream stream, TcpClient tcpClient, string path)
+        private void SendClientFileUdp(UdpClient udpClient, NetworkStream stream, string path)
         {
             using (FileStream fs = new FileStream(path.ToString(), FileMode.Open, FileAccess.Read))
             {
@@ -154,20 +166,26 @@ namespace Client
                 for (int i = 0; i < parts; i++)                
                     SendBlockOfFile(udpClient, stream, fs, i, endPoint);
 
-                //Формирование сообщения об успешной отправке всех блоков
-                string message = "111";
-                Console.WriteLine($"Все блоки отправлены");
-                byte[] sendBytes = Encoding.Default.GetBytes(message);
+                try
+                {
+                    //Формирование сообщения об успешной отправке всех блоков
+                    string message = "111";
+                    Console.WriteLine($"Все пакеты отправлены");
+                    byte[] sendBytes = Encoding.Default.GetBytes(message);
 
-                //Отправка сообщения об успешной отправке всех блоков
-                udpClient.Send(sendBytes, sendBytes.Length, endPoint);
-                Console.WriteLine($"Отправлено сообщение о завершении сеанса");
-
-                //Закрытие
-                stream.Close();
-                udpClient.Close();
-                tcpClient.Close();
-
+                    //Отправка сообщения об успешной отправке всех блоков
+                    udpClient.Send(sendBytes, sendBytes.Length, endPoint);
+                    Console.WriteLine($"Отправлено сообщение о завершении сеанса");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Exception: {0}", e.Message);
+                }//Закрытие
+                finally
+                {
+                    stream.Close();
+                    udpClient.Close();
+                }              
                 Console.WriteLine("-----------*******Клиент отключен*******-----------");
             }
         }
@@ -175,9 +193,19 @@ namespace Client
         //Определение количества блоков, которые нужно отправить
         private int SizeOfFile(FileStream fs)
         {
-            int parts = (int)fs.Length / sizeOfPacket;
-            if ((int)fs.Length % sizeOfPacket != 0)
-                parts++;
+            int parts = 0;
+            try
+            {
+                parts = (int)fs.Length / sizeOfPacket;
+                if ((int)fs.Length % sizeOfPacket != 0)
+                    parts++;
+                Console.WriteLine($"Необходимо отправить {parts} пакетов");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+                fs.Close();
+            }
             return parts;
         }
 
@@ -185,8 +213,16 @@ namespace Client
         private void SendBlockOfFile(UdpClient udpClient, NetworkStream stream,FileStream fs, int i, IPEndPoint endPoint)
         {
             //Формирование отправляемого пакета из файла с выделением 4-х позиций в байтовом массиве под ID пакета
-            byte[] sendBytes = new Byte[sizeOfPacket];
-            fs.Read(sendBytes, 0, sendBytes.Length - 4);
+            byte[] sendBytes = new byte[sizeOfPacket];
+            try
+            {
+                fs.Read(sendBytes, 0, sendBytes.Length - 4);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+                fs.Close();
+            }
 
 
             //добавление ID в пакет 
@@ -197,9 +233,9 @@ namespace Client
             }
 
             //Отправка пакета
-            Console.WriteLine($"Отправка блока файла номер {i + 1}");
+            Console.WriteLine($"Отправка пакета с id = {i + 1}");
             udpClient.Send(sendBytes, sendBytes.Length, endPoint);
-            Console.WriteLine($"Блок {i + 1} отправлен");
+            Console.WriteLine($"Пакет с id = {i + 1} отправлен");
             //Ожидание получения ответа по TCP Сокету
             AcceptConfirm(udpClient, stream, sendBytes, endPoint);
         }
