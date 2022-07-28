@@ -18,57 +18,8 @@ namespace Client
         private int timeOut; // Таймаут, получается из ввода
         private int sizeOfPacket = 8192; //Размер пакета в байтах
 
-        //Ввод данных вручную
-        private void InputClientData()
-        {
-            Console.WriteLine("Введите : \n\t1)IP\n\t2)Номер порта подключения к серверу\n\t3)Порт для отправки Udp\n\t4)Путь к файлу\n\t5)Таймаут\nВнимание, данные вводятся через пробел в одну строку.");
-            string input = Console.ReadLine();
-            string[] mass = input.Split(" ");
-            //Если ввод был пустым или было введено некорректное значение параметров
-            while (input == null || input == "" || mass.Length<4)
-            {
-                Console.WriteLine("Пустой ввод. Попробуйте повторить попытку.");
-                input = Console.ReadLine();                
-            }
-            try
-            {
-                int length = mass.Length;
-                //Ввод данных
-                serverAddress = mass[0];
-                ipAddress = IPAddress.Parse(serverAddress);
-                tcpServerPort = Int32.Parse(mass[1]);
-                udpServerPort = Int32.Parse(mass[2]);
-                for (int i = 3; i < mass.Length - 1; i++)
-                    path += " " + mass[i];
-                path = path.Substring(1, path.Length - 1);
-                timeOut = Int32.Parse(mass[mass.Length - 1]);
-
-                using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read))
-                {
-                    //По условию загружается файл размером до 10МБ
-                    while (fs.Length >= 10485760)
-                    {
-                        Console.WriteLine("Файл слишком велик и не соответствует условию. Попробуйте выбрать другой файл и повторить попытку ввода");
-                        input = Console.ReadLine();
-                        length = mass.Length;
-                        //Ввод данных
-                        serverAddress = mass[0];
-                        ipAddress = IPAddress.Parse(serverAddress);
-                        tcpServerPort = Int32.Parse(mass[1]);
-                        udpServerPort = Int32.Parse(mass[2]);
-                        for (int i = 3; i < mass.Length - 1; i++)
-                            path += " " + mass[i];
-                        path = path.Substring(1, path.Length - 1);
-                        timeOut = Int32.Parse(mass[mass.Length - 1]);
-                    }
-                } 
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Exception: {0}", e.Message);
-            }
-        }
-
+        
+        //Основной метод клиента
         public void CreateClient()
         {
             //ввод данных вручную
@@ -107,6 +58,87 @@ namespace Client
             Console.ReadLine();
         }
 
+        //Ввод данных вручную
+        private void InputClientData()
+        {
+            Console.WriteLine("Введите : \n\t1)IP\n\t2)Номер порта подключения к серверу\n\t3)Порт для отправки Udp\n\t4)Путь к файлу\n\t5)Таймаут\nВнимание, данные вводятся через пробел в одну строку.");
+            string input = Console.ReadLine();
+            string[] mass = input.Split(" ");
+            //Если ввод был пустым или было введено некорректное значение параметров
+            while (input == null || input == "" || mass.Length < 4)
+            {
+                Console.WriteLine("Пустой ввод или введено недостаточное количество параметров. Попробуйте повторить попытку.");
+                input = Console.ReadLine();
+            }
+            try
+            {
+                int length = mass.Length;
+                //Ввод данных
+                serverAddress = mass[0];
+                ipAddress = IPAddress.Parse(serverAddress);
+                tcpServerPort = Int32.Parse(mass[1]);
+                udpServerPort = Int32.Parse(mass[2]);
+                //Парсинг, в случае, если путь к файлу содержит пробелы
+                for (int i = 3; i < mass.Length - 1; i++)
+                    path += " " + mass[i];
+                path = path.Substring(1, path.Length - 1);
+                timeOut = Int32.Parse(mass[mass.Length - 1]);
+
+                using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+                {
+                    //По условию загружается файл размером до 10МБ
+                    while (fs.Length >= 10485760)
+                    {
+                        Console.WriteLine("Файл слишком велик и не соответствует условию. Попробуйте выбрать другой файл и повторить попытку ввода");
+                        input = Console.ReadLine();
+                        length = mass.Length;
+                        //Ввод данных
+                        serverAddress = mass[0];
+                        ipAddress = IPAddress.Parse(serverAddress);
+                        tcpServerPort = Int32.Parse(mass[1]);
+                        udpServerPort = Int32.Parse(mass[2]);
+                        for (int i = 3; i < mass.Length - 1; i++)
+                            path += " " + mass[i];
+                        path = path.Substring(1, path.Length - 1);
+                        timeOut = Int32.Parse(mass[mass.Length - 1]);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception: {0}", e.Message);
+            }
+        }
+
+        //Получение ответа об успешном соединение по TCP
+        private void AcceptClientTcp(NetworkStream stream)
+        {
+            //Переменные для чтения
+            byte[] data = new byte[256];
+            StringBuilder readResponse = new StringBuilder();
+
+            //Чтение данных
+            do
+            {
+                int bytes = stream.Read(data, 0, data.Length);
+                readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
+            }
+            while (stream.DataAvailable); // пока данные есть в потоке
+
+            Console.WriteLine("Получено сообщение: " + readResponse.ToString());
+
+        }
+
+        //Отправка данных об порте и имени файла
+        private void SendClientTcp(NetworkStream stream)
+        {
+            string response = Path.GetFileName(path) + " " + udpServerPort;
+            byte[] data = Encoding.UTF8.GetBytes(response);
+            stream.Write(data, 0, data.Length);
+            Console.WriteLine("Отправлено сообщение: " + response);
+
+        }
+
         //Метод отправки файла по частям с подтверждением по TCP 
         private void SendClientFileUdp(UdpClient udpClient, NetworkStream stream, TcpClient tcpClient, string path)
         {
@@ -137,6 +169,15 @@ namespace Client
 
                 Console.WriteLine("-----------*******Клиент отключен*******-----------");
             }
+        }
+
+        //Определение количества блоков, которые нужно отправить
+        private int SizeOfFile(FileStream fs)
+        {
+            int parts = (int)fs.Length / sizeOfPacket;
+            if ((int)fs.Length % sizeOfPacket != 0)
+                parts++;
+            return parts;
         }
 
         //Отправка блока файла
@@ -190,44 +231,6 @@ namespace Client
             }
             while (stream.DataAvailable || bytes<=0); // пока данные есть в потоке или пока не прийдёт ответ
             Console.WriteLine("Получено сообщение: " + readResponse.ToString());
-        }
-
-        //Определение количества блоков, которые нужно отправить
-        private int SizeOfFile(FileStream fs)
-        {
-            int parts = (int)fs.Length / sizeOfPacket;
-            if ((int)fs.Length % sizeOfPacket != 0)
-                parts++;
-            return parts;
-        }
-
-        //Получение ответа об успешном соединение по TCP
-        private void AcceptClientTcp(NetworkStream stream)
-        {
-            //Переменные для чтения
-            byte[] data = new byte[256];
-            StringBuilder readResponse = new StringBuilder();
-
-            //Чтение данных
-            do
-            {
-                int bytes = stream.Read(data, 0, data.Length);
-                readResponse.Append(Encoding.UTF8.GetString(data, 0, bytes));
-            }
-            while (stream.DataAvailable); // пока данные есть в потоке
-
-            Console.WriteLine("Получено сообщение: " + readResponse.ToString());
-
-        }
-
-        //Отправка данных об порте и имени файла
-        private void SendClientTcp(NetworkStream stream)
-        {
-            string response = Path.GetFileName(path) + " " + udpServerPort;
-            byte[] data = Encoding.UTF8.GetBytes(response);
-            stream.Write(data, 0, data.Length);
-            Console.WriteLine("Отправлено сообщение: " + response);
-
         }
 
     }
