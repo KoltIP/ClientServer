@@ -108,6 +108,7 @@ namespace Client
             {
                 Console.WriteLine("Exception: {0}", e.Message);
             }
+            
         }
 
         //Получение ответа об успешном соединение по TCP
