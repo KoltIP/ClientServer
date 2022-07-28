@@ -9,16 +9,12 @@ using System.Threading.Tasks;
 namespace Server
 {
     public class MainServer
-    {
-        TcpListener server = null;
-        UdpClient udp = null;
-        IPAddress adress = IPAddress.Parse("127.0.0.1");//IP server
-        int tcpPort = 8888;//TCP port server
-        int udpPort = 9999;//Udp port server
-        string fileName = string.Empty; //расположение файла, берётся из ввода
-        string nameOfFile = string.Empty; //название файла, получается от клиента
-        List<byte[]> list = new List<byte[]>();
-        string path = @"C:\Users\user\Desktop\NetSchool2021-master";
+    {       
+        IPAddress adress;
+        int tcpPort; // Tcp порт, получаемый из ввода
+        int udpPort; // Udp порт, получаемый из ввода
+        string fileName = string.Empty; //имя файла, берётся из ввода
+        string path = string.Empty; //Расположение файла , берётся из ввода 
 
         private void InputServerData()
         {
@@ -34,7 +30,7 @@ namespace Server
             {
                 adress = IPAddress.Parse(mass[0]);
                 tcpPort = Int32.Parse(mass[1]);
-                fileName = mass[2];
+                path = mass[2];
             }
             catch (Exception e)
             {
@@ -155,7 +151,9 @@ namespace Server
         public void CreateServer()
         {
             //ввод данных вручную
-            server = new TcpListener(adress, tcpPort);
+            InputServerData();
+
+            TcpListener server = new TcpListener(adress, tcpPort);
             try
             {
                 server.Start();
@@ -171,12 +169,11 @@ namespace Server
                     //отсылаем оповещение о подключении
                     SendServerTcp(client, stream);
 
-                    List<string> list;
-                    list = AcceptServerTcp(client, stream);
-                    nameOfFile = list[0];
+                    List<string> list = AcceptServerTcp(client, stream);
+                    fileName = list[0];
                     udpPort = Int32.Parse(list[1]);
                     UdpClient udpClient = new UdpClient();
-                    AcceptServerUdp(udpClient, stream, path, nameOfFile);
+                    AcceptServerUdp(udpClient, stream, path, fileName);
                 }
             }
             catch (Exception e)
